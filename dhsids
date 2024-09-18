@@ -1,0 +1,99 @@
+WITH
+
+dhs_search AS(
+  select
+    searchreq.reqid,
+    searchreq.userid,
+    bgorders.custid,
+    bgorders.actid,
+    bgorders.bgorderid,
+    bgorders.positionid,
+    bgorders.ownerid,
+    searchreq.jurisid,
+    invite.inviteid as inviteid,
+    einvite.inviteid as einviteid
+  from sp_abshire.mv_searchreq_tat as searchreq
+  inner join sp_abshire.mv_bgorders_tat as bgorders on bgorders.bgorderid = searchreq.orderid
+  inner join sp_abshire.sitesettings as ss on ss.actid = bgorders.actid and ss.custid = bgorders.custid and ss.sName = 'OhsCustomerId' and coalesce(ss.sValue, '0') > '0'
+  left outer join sp_abshire.bgOrderInvite as invite on invite.bgorderid = searchreq.orderid
+  left outer join sp_abshire.bgEInvite as einvite on einvite.inviteid = invite.inviteid
+  where searchreq.productid in (147,269,287)
+),
+
+dhs_search_request AS(
+  select
+    request.reference_id as reqid,
+    max(request.id) as requestid
+  from s1.ohs.request as request
+  group by request.reference_id
+),
+
+dhs_request_test AS(
+  select
+    test.request_id as requestid,
+    max(test.id) as testid
+  from s1.ohs.test as test
+  group by test.request_id
+),
+
+dhs_request_event AS(
+  select
+    request_event.request_id as requestid,
+    max(request_event.id) as eventid
+  from s1.ohs.request_event as request_event
+  where request_event.event_type_code in (
+    -- client viewable events
+    'CSU10', 'CSU11', 'CSU12', 'CSU2', 'CSU3', 'CSU4', 'CSU5', 'CSU6', 'CSU7', 'CSU8', 'CSU9', 'DSU1', 'DSU10', 'DSU11', 'DSU13', 'DSU14', 'DSU2', 'DSU3', 'DSU4', 'DSU5', 'DSU6', 'DSU7', 'DSU8', 'DSU9', 'ISU1', 'ISU2', 'ISU4', 'KSU1', 'KSU2', 'KSU3', 'KSU4', 'KSU5', 'KSU6', 'KSU7')
+  group by request_event.request_id
+)
+
+select
+        search.reqid,
+        search.custid,
+        search.actid,
+        search.userid,
+        search.bgorderid,
+        search.positionid,
+        search.ownerid,
+        search.jurisid,
+        search.einviteid,
+        request.id as requestid,
+        test.id as testid,
+        test.lab_id as test_labid,
+        test.panel_id as testpanelid,
+        test.collection_site_id as test_siteid,
+        test.customer_id as customerid,
+        test.result_code as resultcode,
+        test.billing_tier_id as test_billingtierid,
+        test.reason_code as test_reasoncode,
+        test.disposition_code as disposition,
+        test.request_type_code as test_requesttype,
+        test.dot_mode_code as test_dotmodecode,
+        request.participant_id as participantid,
+        request.lab_account_id as labaccountid,
+        request.dot_mode_code as request_dotmodecode,
+        request.request_type_code as request_requesttype,
+        request.status_id as statusid,
+        request.workflow_type as workflow,
+        request_event.eventid as eventid,
+        request.panel_id as requestpanelid,
+        cast(request.billing_tier as int) as request_billingtierid,
+        request.collection_site_id as request_siteid,
+        request.lab_id as request_labid,
+        request.test_reason_code as request_reasoncode,
+        panel.taxonomy_id as panel_taxonomyid
+      from
+        ${dhs_search.SQL_TABLE_NAME} as search
+      left outer join
+        ${dhs_search_request.SQL_TABLE_NAME} as search_request on search_request.reqid = search.reqid
+      left outer join
+        ${dhs_request_test.SQL_TABLE_NAME} as request_test on request_test.requestid = search_request.requestid
+      left outer join
+        ${dhs_request_event.SQL_TABLE_NAME} as request_event on request_event.requestid = search_request.requestid
+      left outer join
+        s1.ohs.request as request on request.id = search_request.requestid
+      left outer join
+        s1.ohs.test as test on test.id = request_test.testid
+      left outer join
+        s1.ohs.r_drug_panel as panel on panel.id = request.panel_id
+    ;;
