@@ -1,0 +1,120 @@
+SELECT
+    coalesce(bgorders.firstname, '') + ' ' +  coalesce(bgorders.middlename, '') + ' ' +  coalesce(bgorders.lastname,'')  AS "bgorders.fullname",
+    bgorders.bgorderid  AS "bgorders.bgorderid",
+    searchreq.reqid  AS "searchreq.reqid",
+    bgorders.actid  AS "customers.actid",
+    accounts.company  AS "accounts.company",
+    enum_searchstatus.enumname AS "searchreq.status_text",
+    enum_searchscore.enumname AS "searchreq.score_text",
+    bgorders.emailaddr  AS "bgorders.emailaddr",
+    juris.jurisdesc  AS "juris.jurisdesc",
+    order_facts.package_name  AS "order_facts.package_name",
+    jobpositions.jobtitle  AS "jobpositions.jobtitle",
+    r_job.description AS "r_job.description",
+    bgorders.billcode  AS "bgorders.billcode",
+        (DATE(searchreq.created )) AS "searchreq.created_date",
+    r_status.description AS "r_status.description",
+    r_result.description  AS "r_result.description",
+    r_workflow_type.description AS "r_workflow_type.description",
+    coalesce(r_request_collection_site_network.description,r_test_collection_site_network.description)  AS "dhs_merged_order.collection_network",
+    request.registration_id  AS "request.registration_id",
+        (DATE(request.expiration_date )) AS "request.expiration_date",
+        (DATE(dhs_tat.collection_date)) AS "dhs_tat.collection_date",
+    coalesce(r_request_reason_code.description,r_test_reason_code.description)  AS "dhs_merged_order.reason_for_test",
+    request.coc  AS "request.coc",
+    coalesce(request.specimen_id,test.specimen_id)  AS "dhs_merged_order.specimen_id",
+    coalesce(request_collection_site.code,test_collection_site.code)  AS "dhs_merged_order.site_code",
+    coalesce(request_collection_site.description,test_collection_site.description)  AS "dhs_merged_order.site_decription",
+    coalesce(request_collection_site.state,test_collection_site.state)  AS "dhs_merged_order.site_state",
+    coalesce(request_lab.description,test_lab.description)  AS "dhs_merged_order.lab_description",
+    coalesce(r_request_dot_mode.description,r_test_dot_mode.description)  AS "dhs_merged_order.dot_mode",
+    CASE
+  WHEN ((coalesce(r_request_billing_tier.description, r_test_billing_tier.description)) IN ('Tier 4', 'Tier 5')) THEN 'Patient Service Center'
+  WHEN ((coalesce(r_request_billing_tier.description, r_test_billing_tier.description)) IN ('Tier 1', 'Tier 2')) THEN 'In-Network'
+  WHEN (((coalesce(r_request_billing_tier.description, r_test_billing_tier.description))) = 'Tier 3') THEN 'Out-of-Network'
+  ELSE 'Other'
+END
+ AS "billing_tier",
+    CASE WHEN request.auto_generated = 'true' THEN 1 ELSE 0 END  AS "request.auto_generated",
+    AVG(case when dhs_tat.created_collection_tat < 0 then null else dhs_tat.created_collection_tat / 1440.0 end ) AS "dhs_tat.created_collection_days",
+    AVG(case when dhs_tat.collection_lab_tat < 0 then null else dhs_tat.collection_lab_tat / 1440.0 end ) AS "dhs_tat.collection_lab_days",
+    AVG(case when dhs_tat.lab_mro_tat < 0 then null else dhs_tat.lab_mro_tat / 1440.0 end ) AS "dhs_tat.lab_mro_days",
+    AVG(case when dhs_tat.mro_reported_tat < 0 then null else dhs_tat.mro_reported_tat / 1440.0 end ) AS "dhs_tat.mro_reported_days",
+    AVG(case when dhs_tat.reported_closed_tat < 0 then null else dhs_tat.reported_closed_tat / 1440.0 end ) AS "dhs_tat.reported_closed_days",
+    AVG(case when dhs_tat.collection_closed_tat < 0 then null else dhs_tat.collection_closed_tat / 1440.0 end ) AS "dhs_tat.collection_closed_days",
+    AVG(case when dhs_tat.created_closed_tat < 0 then null else dhs_tat.created_closed_tat / 1440.0 end ) AS "dhs_tat.created_closed_days",
+    AVG(case when dhs_tat.collection_closed_weekdays < 0 then null else dhs_tat.collection_closed_weekdays/1.0 end ) AS "dhs_tat.collection_closed_weekdays",
+    AVG(case when dhs_tat.created_closed_weekdays < 0 then null else dhs_tat.created_closed_weekdays/1.0 end ) AS "dhs_tat.created_closed_weekdays"
+FROM looker_tmp.LR$KVR5W1726667588379_dhsids AS dhsids
+INNER JOIN sp_abshire.mv_searchreq_tat  AS searchreq ON searchreq.reqid = dhsids.reqid
+LEFT JOIN s1.ohs.request  AS request ON request.id = dhsids.requestid
+LEFT JOIN s1.ohs.request  AS dhs_merged_order ON dhs_merged_order.id = dhsids.requestid
+LEFT JOIN looker_tmp.LR$KVU351726667450434_dhs_tat AS dhs_tat ON dhs_tat.reqid = dhsids.reqid
+INNER JOIN sp_abshire.order_facts_mv AS order_facts ON order_facts.bgorderid = dhsids.bgorderid
+INNER JOIN looker_tmp.LR$KVFLM1726633012048_enum_searchstatus AS enum_searchstatus ON searchreq.status = enum_searchstatus.enumvalue
+INNER JOIN looker_tmp.LR$KVYJL1726633024866_enum_searchscore AS enum_searchscore ON searchreq.score = enum_searchscore.enumvalue
+LEFT JOIN s1.ohs.participant  AS participant ON dhsids.participantid = participant.id
+LEFT JOIN s1.ohs.r_job AS r_job ON r_job.code = participant.job_code
+LEFT JOIN sp_abshire.accounts  AS accounts ON dhsids.actid = accounts.actid
+LEFT JOIN sp_abshire.mv_bgorders_tat  AS bgorders ON dhsids.bgorderid = bgorders.bgorderid
+LEFT JOIN sp_abshire.customers  AS customers ON dhsids.custid = customers.custid
+LEFT JOIN sp_abshire.juris  AS juris ON dhsids.jurisid = juris.jurisid
+LEFT JOIN s1.ohs.lab  AS test_lab ON dhsids.test_labid = test_lab.id
+LEFT JOIN s1.ohs.lab  AS request_lab ON dhsids.request_labid = request_lab.id
+LEFT JOIN s1.ohs.collection_site  AS test_collection_site ON dhsids.test_siteid = test_collection_site.id
+LEFT JOIN s1.ohs.collection_site  AS request_collection_site ON dhsids.request_siteid = request_collection_site.id
+LEFT JOIN s1.ohs.test  AS test ON dhsids.testid = test.id
+LEFT JOIN sp_abshire.jobpositions  AS jobpositions ON dhsids.positionid = jobpositions.positionid
+LEFT JOIN s1.ohs.r_result  AS r_result ON dhsids.resultcode = r_result.code
+LEFT JOIN s1.ohs.r_billing_tier  AS r_test_billing_tier ON dhsids.test_billingtierid = r_test_billing_tier.id
+LEFT JOIN s1.ohs.r_billing_tier  AS r_request_billing_tier ON dhsids.request_billingtierid = r_request_billing_tier.id
+LEFT JOIN s1.ohs.r_dot_mode  AS r_test_dot_mode ON dhsids.test_dotmodecode = r_test_dot_mode.code
+LEFT JOIN s1.ohs.r_dot_mode  AS r_request_dot_mode ON dhsids.request_dotmodecode = r_request_dot_mode.code
+LEFT JOIN s1.ohs.r_reason_code  AS r_test_reason_code ON dhsids.test_reasoncode = r_test_reason_code.code
+LEFT JOIN s1.ohs.r_reason_code  AS r_request_reason_code ON dhsids.request_reasoncode = r_request_reason_code.code
+LEFT JOIN s1.ohs.r_status  AS r_status ON dhsids.statusid = r_status.id
+LEFT JOIN s1.ohs.r_workflow_type  AS r_workflow_type ON dhsids.workflow = r_workflow_type.id
+LEFT JOIN s1.ohs.r_collection_site_network  AS r_test_collection_site_network ON test_collection_site.network_code = r_test_collection_site_network.code
+LEFT JOIN s1.ohs.r_collection_site_network  AS r_request_collection_site_network ON request_collection_site.network_code = r_request_collection_site_network.code
+WHERE ((( case when
+      searchreq.status >= 100 then searchreq.due
+      else NULL
+      end ) >= ((DATEADD(day,-29, DATE_TRUNC('day',GETDATE()) ))) AND ( case when
+      searchreq.status >= 100 then searchreq.due
+      else NULL
+      end ) < ((DATEADD(day,30, DATEADD(day,-29, DATE_TRUNC('day',GETDATE()) ) ))))) AND (enum_searchstatus.enumname) IN ('Complete', 'Deleted') AND (bgorders.custid ) = 21235
+GROUP BY
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31
+ORDER BY
+    39 DESC
+LIMIT 500
