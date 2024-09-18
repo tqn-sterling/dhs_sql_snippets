@@ -1,0 +1,110 @@
+select
+        dhs_tat.*
+      from
+        (
+          select
+            tat_dates.*,
+
+            datediff(minutes, created_date, collection_date) as created_collection_tat,
+            datediff(minutes, collection_date, lab_date) as collection_lab_tat,
+            datediff(minutes, collection_date, mro_date) as collection_mro_tat,
+            datediff(minutes, lab_date, mro_date) as lab_mro_tat,
+            datediff(minutes, mro_date, reported_date) as mro_reported_tat,
+            datediff(minutes, mro_date, closed_date) as mro_closed_tat,
+            datediff(minutes, reported_date, closed_date) as reported_closed_tat,
+            datediff(minutes, collection_date, reported_date) as collection_reported_tat,
+            datediff(minutes, collection_date, closed_date) as collection_closed_tat,
+            datediff(minutes, created_date, closed_date) as created_closed_tat,
+            datediff(minutes, expiration_date, closed_date) as expiration_closed_tat,
+
+            datediff(days, created_date, collection_date)
+              -(datediff(weeks, created_date, collection_date) * 2)
+              +(case when date_part(dow, collection_date) = 0 then 1 else 0 end)
+              -(case when date_part(dow, created_date) = 0 then 1 else 0 end)
+              as created_collection_weekdays,
+
+            datediff(days, collection_date, lab_date)
+              -(datediff(weeks, collection_date, lab_date) * 2)
+              +(case when date_part(dow, lab_date) = 0 then 1 else 0 end)
+              -(case when date_part(dow, collection_date) = 0 then 1 else 0 end)
+              as collection_lab_weekdays,
+
+            datediff(days, collection_date, mro_date)
+              -(datediff(weeks, collection_date, mro_date) * 2)
+              +(case when date_part(dow, mro_date) = 0 then 1 else 0 end)
+              -(case when date_part(dow, collection_date) = 0 then 1 else 0 end)
+              as collection_mro_weekdays,
+
+            datediff(days, lab_date, mro_date)
+              -(datediff(weeks, lab_date, mro_date) * 2)
+              +(case when date_part(dow, mro_date) = 0 then 1 else 0 end)
+              -(case when date_part(dow, lab_date) = 0 then 1 else 0 end)
+              as lab_mro_weekdays,
+
+            datediff(days, mro_date, reported_date)
+              -(datediff(weeks, mro_date, reported_date) * 2)
+              +(case when date_part(dow, reported_date) = 0 then 1 else 0 end)
+              -(case when date_part(dow, mro_date) = 0 then 1 else 0 end)
+              as mro_reported_weekdays,
+
+            datediff(days, mro_date, closed_date)
+              -(datediff(weeks, mro_date, closed_date) * 2)
+              +(case when date_part(dow, closed_date) = 0 then 1 else 0 end)
+              -(case when date_part(dow, mro_date) = 0 then 1 else 0 end)
+              as mro_closed_weekdays,
+
+            datediff(days, reported_date, closed_date)
+              -(datediff(weeks, reported_date, closed_date) * 2)
+              +(case when date_part(dow, closed_date) = 0 then 1 else 0 end)
+              -(case when date_part(dow, reported_date) = 0 then 1 else 0 end)
+              as reported_closed_weekdays,
+
+            datediff(days, collection_date, reported_date)
+              -(datediff(weeks, collection_date, reported_date) * 2)
+              +(case when date_part(dow, reported_date) = 0 then 1 else 0 end)
+              -(case when date_part(dow, collection_date) = 0 then 1 else 0 end)
+              as collection_reported_weekdays,
+
+            datediff(days, collection_date, closed_date)
+              -(datediff(weeks, collection_date, closed_date) * 2)
+              +(case when date_part(dow, closed_date) = 0 then 1 else 0 end)
+              -(case when date_part(dow, collection_date) = 0 then 1 else 0 end)
+              as collection_closed_weekdays,
+
+            datediff(days, created_date, closed_date)
+              -(datediff(weeks, created_date, closed_date) * 2)
+              +(case when date_part(dow, closed_date) = 0 then 1 else 0 end)
+              -(case when date_part(dow, created_date) = 0 then 1 else 0 end)
+              as created_closed_weekdays,
+
+            datediff(days, expiration_date, closed_date)
+              -(datediff(weeks, expiration_date, closed_date) * 2)
+              +(case when date_part(dow, closed_date) = 0 then 1 else 0 end)
+              -(case when date_part(dow, expiration_date) = 0 then 1 else 0 end)
+              as expiration_closed_weekdays
+
+
+          from
+            (
+              select
+                searchreq.reqid as reqid,
+                test.request_id as request_id,
+                searchreq.status as status,
+                searchreq.created as created_date,
+                test.collection_date as collection_date,
+                request.expiration_date as expiration_date,
+                test.lab_received_date as lab_date,
+                test.verified_date as mro_date,
+                test.lab_reported_date as reported_date,
+                case
+                  when searchreq.status >= 100 then searchreq.due
+                  else null
+                end as closed_date
+              from
+                sp_abshire.mv_searchreq_tat as searchreq
+              left join
+                s1.ohs.request as request on request.reference_id = searchreq.reqid and searchreq.productid in (147,269,287)
+              left join
+                s1.ohs.test as test on test.request_id = request.id
+            ) as tat_dates
+        ) as dhs_tat
