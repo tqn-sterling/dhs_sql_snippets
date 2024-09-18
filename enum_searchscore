@@ -1,0 +1,6 @@
+SELECT
+  enumname, 
+  enumtype, 
+  enumvalue
+FROM sp_abshire.enumlookup
+WHERE sp_abshire.enumlookup.enumtype = 'Searches.ScoreType' ;;
